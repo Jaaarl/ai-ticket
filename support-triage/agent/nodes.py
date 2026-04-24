@@ -1,4 +1,5 @@
 from .state import TriageState, Intent, Priority, Team
+from .llm import classify_with_ai
 
 def analyze_ticket(state: TriageState) -> TriageState:
     """Extract urgency signals and customer context."""
@@ -7,8 +8,30 @@ def analyze_ticket(state: TriageState) -> TriageState:
 
 def classify_intent(state: TriageState) -> TriageState:
     """Classify as billing/technical/account/feature."""
-    # TODO: Call LLM for classification
-    return state
+    result = classify_with_ai(state.subject, state.body)
+    intent_str = result["intent"].strip().lower()
+    confidence = result.get("confidence", 0.0)
+
+    # Map LLM output to Intent enum - check for keywords in the response
+    intent_lower = intent_str.lower()
+    if "billing" in intent_lower or "invoice" in intent_lower or "payment" in intent_lower and "500" not in intent_lower:
+        intent = Intent.BILLING
+    elif "technical" in intent_lower or "bug" in intent_lower or "500" in intent_lower or "error" in intent_lower:
+        intent = Intent.TECHNICAL
+    elif "account" in intent_lower or "login" in intent_lower or "password" in intent_lower:
+        intent = Intent.ACCOUNT
+    elif "feature" in intent_lower or "request" in intent_lower:
+        intent = Intent.FEATURE_REQUEST
+    else:
+        intent = Intent.UNKNOWN
+
+    needs_escalation = confidence < 0.7
+
+    return state.model_copy(update={
+        "intent": intent,
+        "confidence": confidence,
+        "needs_escalation": needs_escalation,
+    })
 
 def route_ticket(state: TriageState) -> TriageState:
     """Assign team and priority."""
