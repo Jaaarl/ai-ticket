@@ -18,7 +18,12 @@ def update_ticket(ticket_id: str, team: str, priority: str, intent: str):
 @tool
 def search_knowledge_base(query: str) -> list[dict]:
     """Search KB for related articles."""
-    return []
+    # TODO: Replace with your actual KB API (Confluence, Notion, internal docs, etc.)
+    # Returns stub KB links for demo purposes
+    return [
+        {"title": "API Error Troubleshooting", "url": "https://kb.example.com/api-errors"},
+        {"title": "500 Internal Server Error Guide", "url": "https://kb.example.com/500-errors"},
+    ]
 
 @tool
 def notify_discord(message: str) -> dict:

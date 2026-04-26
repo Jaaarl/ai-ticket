@@ -1,6 +1,6 @@
 from .state import TriageState, Intent, Priority, Team
 from .llm import classify_with_ai
-from .tools import get_customer, update_ticket, notify_discord
+from .tools import get_customer, update_ticket, notify_discord, search_knowledge_base
 
 def analyze_ticket(state: TriageState) -> TriageState:
     """Extract urgency signals and customer context."""
@@ -60,7 +60,13 @@ def route_ticket(state: TriageState) -> TriageState:
 
 def enrich_ticket(state: TriageState) -> TriageState:
     """Add KB links and similar tickets."""
-    return state
+    query = f"{state.subject} {state.body}"
+    kb_results = search_knowledge_base.invoke({"query": query})
+    kb_links = [r["url"] for r in kb_results]
+    return state.model_copy(update={
+        "kb_links": kb_links,
+        "similar_ticket_ids": [],  # TODO: hook into ticket history
+    })
 
 def process_ticket(state: TriageState) -> TriageState:
     """Write final decision to your system."""
