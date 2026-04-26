@@ -1,6 +1,6 @@
 from .state import TriageState, Intent, Priority, Team
 from .llm import classify_with_ai
-from .tools import get_customer
+from .tools import get_customer, update_ticket, notify_discord
 
 def analyze_ticket(state: TriageState) -> TriageState:
     """Extract urgency signals and customer context."""
@@ -37,7 +37,7 @@ def classify_intent(state: TriageState) -> TriageState:
     else:
         intent = Intent.UNKNOWN
 
-    needs_escalation = confidence < 0.7
+    needs_escalation = (confidence < 0.7) or state.needs_escalation
 
     return state.model_copy(update={
         "intent": intent,
@@ -64,4 +64,15 @@ def enrich_ticket(state: TriageState) -> TriageState:
 
 def process_ticket(state: TriageState) -> TriageState:
     """Write final decision to your system."""
+    update_ticket.invoke({
+        "ticket_id": state.ticket_id,
+        "team": state.team.value if state.team else "unassigned",
+        "priority": state.priority.value if state.priority else "p3",
+        "intent": state.intent.value if state.intent else "unknown",
+    })
+    if state.needs_escalation:
+        notify_discord.invoke({
+            "channel": "#triage-escalations",
+            "message": f"[ESCALATION] Ticket {state.ticket_id} ({state.priority.value if state.priority else '?'}) assigned to {state.team.value if state.team else '?'}",
+        })
     return state
