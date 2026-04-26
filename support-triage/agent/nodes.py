@@ -1,10 +1,22 @@
 from .state import TriageState, Intent, Priority, Team
 from .llm import classify_with_ai
+from .tools import get_customer
 
 def analyze_ticket(state: TriageState) -> TriageState:
     """Extract urgency signals and customer context."""
-    # TODO: Call LLM or use keyword extraction
-    return state
+    # Fetch customer tier
+    customer = get_customer.invoke({"customer_id": state.customer_id})
+    customer_tier = customer.get("tier", "free")
+
+    # Extract urgency signals from subject + body
+    text = (state.subject + " " + state.body).lower()
+    urgency_keywords = ["outage", "down", "critical", "production", "urgent", "emergency", "p0", "p1"]
+    is_urgent = any(kw in text for kw in urgency_keywords)
+
+    return state.model_copy(update={
+        "customer_tier": customer_tier,
+        "needs_escalation": is_urgent or state.needs_escalation,
+    })
 
 def classify_intent(state: TriageState) -> TriageState:
     """Classify as billing/technical/account/feature."""

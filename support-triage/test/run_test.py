@@ -15,7 +15,9 @@ state = TriageState(
 result = triage_graph.invoke(state)
 
 print(f"Ticket: {result.get('ticket_id')}")
+print(f"Customer Tier: {result.get('customer_tier')}")
 print(f"Intent: {result.get('intent')}")
 print(f"Team: {result.get('team')}")
 print(f"Priority: {result.get('priority')}")
 print(f"Confidence: {result.get('confidence')}")
+print(f"Needs Escalation: {result.get('needs_escalation')}")
