@@ -35,13 +35,16 @@ def classify_intent(state: TriageState) -> TriageState:
 
 def route_ticket(state: TriageState) -> TriageState:
     """Assign team and priority."""
-    # Map intent → team
     intent_map = {
-        Intent.BILLING: Team.BILLING_TEAM,
-        Intent.TECHNICAL: Team.TECHNICAL_TEAM,
-        Intent.ACCOUNT: Team.ACCOUNT_TEAM,
+        Intent.BILLING: (Team.BILLING_TEAM, Priority.P1),
+        Intent.TECHNICAL: (Team.TECHNICAL_TEAM, Priority.P2),
+        Intent.ACCOUNT: (Team.ACCOUNT_TEAM, Priority.P2),
+        Intent.FEATURE_REQUEST: (Team.TECHNICAL_TEAM, Priority.P3),
     }
-    return state
+    team, priority = Team.TECHNICAL_TEAM, Priority.P2  # default fallback
+    if state.intent in intent_map:
+        team, priority = intent_map[state.intent]
+    return state.model_copy(update={"team": team, "priority": priority})
 
 def enrich_ticket(state: TriageState) -> TriageState:
     """Add KB links and similar tickets."""
