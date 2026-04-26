@@ -5,10 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 Platform: Windows (PowerShell)
+Python 3.11+
+Dependencies: `langgraph`, `langchain-core`, `anthropic`, `pydantic`, `httpx`, `python-dotenv`
 
-## Project Overview
+## Setup
 
-Support ticket triage system using LangGraph to route incoming tickets to appropriate teams. Located in `support-triage/`.
+```bash
+# Add your API keys to .env
+cp support-triage/.env support-triage/.env  # edit support-triage/.env directly
+```
 
 ## Commands
 
@@ -25,27 +30,27 @@ analyze → classify → route → enrich → process → END
 ```
 
 **State Schema** (`agent/state.py`):
-- `TriageState` (Pydantic model): ticket_id, subject, body, customer_id, plus analysis results
+- `TriageState` (Pydantic model): ticket_id, subject, body, customer_id, customer_tier, plus routing results
 - Enums: `Intent` (BILLING/TECHNICAL/ACCOUNT/FEATURE_REQUEST/UNKNOWN), `Priority` (P0-P3), `Team` (BILLING_TEAM/TECHNICAL_TEAM/ACCOUNT_TEAM)
 
 **Nodes** (`agent/nodes.py`): Each node is a pure function `(TriageState) → TriageState`:
-- `analyze_ticket`: Extract urgency signals
-- `classify_intent`: Classify ticket type (currently stubbed)
-- `route_ticket`: Assign team/priority using intent_map
-- `enrich_ticket`: Add KB links and similar tickets
-- `process_ticket`: Write decision to ticket system
+- `analyze_ticket`: Fetches customer tier, detects urgency keywords (outage, down, critical, etc.)
+- `classify_intent`: Calls LLM via `classify_with_ai()`, maps response to `Intent` enum via keyword matching
+- `route_ticket`: Assigns team and priority from `intent_map`
+- `enrich_ticket`: Searches KB via `search_knowledge_base`, populates `kb_links`
+- `process_ticket`: Calls `update_ticket` and `notify_discord` (if escalation needed)
 
-**LLM Integration** (`agent/llm.py`): Uses MiniMax's Anthropic-compatible API (`MiniMax-M2.7` model) via Anthropic SDK with base URL `https://api.minimax.io/anthropic`.
+**LLM Integration** (`agent/llm.py`): MiniMax's Anthropic-compatible API (`MiniMax-M2.7` model) via Anthropic SDK with base URL `https://api.minimax.io/anthropic`. Uses `load_dotenv()` to load `.env`.
 
-**Tools** (`agent/tools.py`): LangChain `@tool` decorators for `get_customer`, `update_ticket`, `search_knowledge_base`, `notify_slack` — all stubbed and need real API integration.
+**Tools** (`agent/tools.py`): LangChain `@tool` decorators:
+- `get_customer`: Returns stub customer data (replace with real CRM API)
+- `update_ticket`: Prints routing decision (replace with real ticketing system API)
+- `search_knowledge_base`: Returns stub KB articles (replace with real KB API)
+- `notify_discord`: Posts escalation to Discord webhook via `DISCORD_WEBHOOK_URL` env var
 
 ## Key Patterns
 
 - Nodes return `state.model_copy(update={...})` to create new state
 - Graph built via `StateGraph(TriageState).compile()`
-- Parallel execution via `Send` API (shown in integration doc but not yet implemented in graph.py)
-- Confidence threshold < 0.7 triggers escalation
-
-## Implementation Status
-
-Nodes are scaffolded with TODOs — LLM calls and real tool integrations need to be added. The graph currently passes state through unchanged.
+- Escalation fires when `needs_escalation` is `True` (set by low LLM confidence <0.7 OR urgency keywords detected)
+- Discord webhook URL set via `DISCORD_WEBHOOK_URL` in `.env` — gracefully skips if not set
